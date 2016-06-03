@@ -1,4 +1,4 @@
-##gzip_reader
+##bcall
 Call variants using a site-specific binomial model.
 
 ###Install
