@@ -24,6 +24,7 @@ DEALINGS IN THE SOFTWARE.  */
 
 #include <bitset>
 #include <fstream>
+#include <functional>
 #include <map>
 #include <sstream>
 #include "gzstream/gzstream.h"
