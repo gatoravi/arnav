@@ -154,9 +154,14 @@ void parse_readcount_file(string sample, string gzfile, function<void(string, st
     igzstream in(gzfile.c_str());
     cerr << "Opening " << gzfile << endl;
     std::string line;
+    int line_count = 0;
     std::getline(in, line); //Skip header
     while(std::getline(in, line)){
         func(sample, line);
+        line_count += 1;
+    }
+    if(!line_count) {
+        throw runtime_error("Readcount file empty - " + gzfile);
     }
 }
 
@@ -193,20 +198,30 @@ void read_samples(char* samples_file) {
     ifstream sample_fh(samples_file, ios::in);
     string line;
     string sample, readcountfile;
+    int line_count = 0;
     while (getline(sample_fh, line)) {
         stringstream iss(line);
         iss >> sample >> readcountfile;
         sample_to_readcountfile[sample] = readcountfile;
+        line_count++;
+    }
+    if(!line_count) {
+        throw runtime_error("Sample file empty - " + string(samples_file));
     }
 }
 
 int main(int argc, char* argv[]) {
     if(argc > 1) {
-        read_samples(argv[1]);
-        calculate_priors();
-        //print_priors();
-        print_header();
-        apply_model();
+        try {
+            read_samples(argv[1]);
+            calculate_priors();
+            //print_priors();
+            print_header();
+            apply_model();
+        } catch (const runtime_error& e) {
+            cerr << e.what() << endl;
+            return 1;
+        }
     } else {
         return usage();
     }
