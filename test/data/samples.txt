@@ -1,0 +1,3 @@
+t1 ../test/data/t1.gz
+t2 ../test/data/t2.gz
+t3 ../test/data/t3.gz
