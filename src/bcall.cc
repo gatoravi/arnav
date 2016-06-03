@@ -67,7 +67,7 @@ int usage() {
 //Left shift the position, AND the chr bits
 uint64_t create_key(string chr, uint32_t pos) {
     int chr_int = chr_to_int[chr];
-    /*
+    /* //see binary encoding
     bitset<5> x(chr_int);
     cerr << "chr_x is " << x << endl;
     bitset<32> pos_x(pos);
@@ -80,8 +80,56 @@ uint64_t create_key(string chr, uint32_t pos) {
     return unique_key;
 }
 
+//Print output header
+void print_header(ostream& out = cout) {
+    out << "sample" << "\t"
+        << "p_value" << "\t"
+        << "chr" << "\t"
+        << "pos" << "\t"
+        << "depth" << "\t"
+        << "ref_base" << "\t"
+        << "refcount" << "\t"
+        << "altcount" << "\t"
+        << "acount" << "\t"
+        << "ccount" << "\t"
+        << "gcount" << "\t"
+        << "tcount" << "\t"
+        << "ncount" << "\t"
+        << "indelcount"
+        << endl;
+}
+
+//Print output header
+inline void print_out_line(string sample, double p_value, string line, ostream& out = cout) {
+    out << sample << "\t" << p_value << "\t" << line << endl;
+}
+
+//Takes a line of the readcount file as input and applies
+//the binomial test, the `p` is calculated using all the
+//readcounts at this site across samples
+void apply_model_readcount_line(string sample, string line) {
+    stringstream ss(line);
+    string chr, ref;
+    uint32_t pos, depth, ref_count, alt_count;
+    ss >> chr >> pos >> depth >> ref;
+    ss >> ref_count >> alt_count;
+    if(chr_to_int.find(chr) != chr_to_int.end()) {
+        uint64_t key = create_key(chr, pos);
+        if(site_readcounts.find(key) == site_readcounts.end()) {
+            throw runtime_error("Unable to find chr/pos " + chr + " " + to_string(pos));
+        }
+        double prior_p =
+            (double)site_readcounts[key].first/(double) site_readcounts[key].second;
+        //(1 - pbinom(8, 10, 0.5)) * 2  == binom.test(9, 10, 0.5, alternative="t")
+        double p_value = (1 - pbinom(alt_count, ref_count + alt_count - 1, prior_p, true, false)) * 2;
+        if (p_value < 0.05) {
+            print_out_line(sample, p_value, line);
+        }
+    }
+}
+
 //parse a line from the readcount file
-void parse_readcount_line(string line) {
+void parse_readcount_line(string sample, string line) {
     stringstream ss(line);
     string chr, ref;
     uint32_t pos, depth, ref_count, alt_count;
@@ -98,24 +146,34 @@ void parse_readcount_line(string line) {
     }
 }
 
-//iterate through readcount file - this is gzipped
-void parse_readcount_file(string gzfile) {
+//iterate through readcount file - And apply model to each line
+//first arg is name of the gz file
+//second argument is the function to apply to each line of the file
+void parse_readcount_file(string sample, string gzfile, function<void(string, string)> func) {
     igzstream in(gzfile.c_str());
     cerr << "Opening " << gzfile << endl;
     std::string line;
-    std::cout << "pbinom " << pbinom(1, 10, 0.5, true, false) <<
-    std::endl;
     std::getline(in, line); //Skip header
     while(std::getline(in, line)){
-        parse_readcount_line(line);
+        func(sample, line);
     }
 }
 
 //Iterate through each sample's readcounts
 void calculate_priors() {
+    function<void(string, string)> parse_line = parse_readcount_line;
     for (auto& kv : sample_to_readcountfile) {
         cerr << "Processing " << kv.first << endl;
-        parse_readcount_file(kv.second);
+        parse_readcount_file(kv.first, kv.second, parse_line);
+    }
+}
+
+//Iterate through each sample's readcounts and call
+void apply_model() {
+    function<void(string, string)> apply_model_line = apply_model_readcount_line;
+    for (auto& kv : sample_to_readcountfile) {
+        cerr << "Applying model to " << kv.first << endl;
+        parse_readcount_file(kv.first, kv.second, apply_model_line);
     }
 }
 
@@ -137,7 +195,6 @@ void read_samples(char* samples_file) {
     while (getline(sample_fh, line)) {
         stringstream iss(line);
         iss >> sample >> readcountfile;
-        cerr << endl << sample;
         sample_to_readcountfile[sample] = readcountfile;
     }
 }
@@ -146,7 +203,9 @@ int main(int argc, char* argv[]) {
     if(argc > 1) {
         read_samples(argv[1]);
         calculate_priors();
-        print_priors();
+        //print_priors();
+        print_header();
+        apply_model();
     } else {
         return usage();
     }
