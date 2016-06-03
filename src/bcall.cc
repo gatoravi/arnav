@@ -122,7 +122,7 @@ void apply_model_readcount_line(string sample, string line) {
             (double)site_readcounts[key].first/(double) site_readcounts[key].second;
         //(1 - pbinom(8, 10, 0.5)) * 2  == binom.test(9, 10, 0.5, alternative="t")
         double p_value = (1 - pbinom(alt_count, ref_count + alt_count - 1, prior_p, true, false)) * 2;
-        if (p_value < 0.05) {
+        if (p_value < 0.05 && ref_count != 0 && alt_count != 0) {
             print_out_line(sample, p_value, line);
         }
     }
