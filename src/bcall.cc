@@ -225,15 +225,29 @@ void write_priors(const string& output_file) {
 }
 
 //Read the priors map from a file
-void read_priors(const string& prior_file) {
-    ifstream fin(prior_file);
-    if (!fin.is_open()) {
-        throw runtime_error("unable to open " + prior_file +
-                            " for reading priors.");
+void read_priors() {
+    for (auto& kv : sample_to_readcountfile) {
+        cout << "Reading dump " << kv.first << endl;
+        string prior_file = kv.second;
+        ifstream fin(prior_file);
+        if (!fin.is_open()) {
+            throw runtime_error("unable to open " + prior_file +
+                                " for reading priors.");
+        }
+        cereal::BinaryInputArchive archive(fin);
+        std::unordered_map<uint64_t, readcounts> temp_site_readcounts;
+        archive(temp_site_readcounts);
+        //Aggregate temp with main
+        for (auto& kv : temp_site_readcounts) {
+            if (site_readcounts.find(kv.first) == site_readcounts.end()) {
+                site_readcounts[kv.first] = kv.second;
+            } else {
+                site_readcounts[kv.first].total_ref_count += kv.second.total_ref_count;
+                site_readcounts[kv.first].total_alt_count += kv.second.total_alt_count;
+            }
+        }
+        fin.close();
     }
-    cereal::BinaryInputArchive archive(fin);
-    archive(site_readcounts);
-    fin.close();
 }
 
 //Iterate through the samples file and calc site-specific priors
@@ -272,7 +286,8 @@ int main(int argc, char* argv[]) {
             }
         }
         if (argc == 3 && string(argv[1]) == "prior-merge") {
-            read_priors(string(argv[2]));
+            read_samples(argv[2]);
+            read_priors();
             print_priors();
             return 0;
         }
