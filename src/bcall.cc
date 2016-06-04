@@ -182,6 +182,7 @@ void parse_readcount_file(string sample, string gzfile, function<void(string, st
     if(!line_count) {
         throw runtime_error("Readcount file empty - " + gzfile);
     }
+    cerr << "Read " << line_count << " lines from " << gzfile << endl;
 }
 
 //Iterate through each sample's readcounts
@@ -190,6 +191,7 @@ void calculate_priors() {
     for (auto& kv : sample_to_readcountfile) {
         cerr << "Processing " << kv.first << endl;
         parse_readcount_file(kv.first, kv.second, parse_line);
+        cerr << "Size of readcount map is " << site_readcounts.size() << endl;
     }
 }
 
