@@ -1,5 +1,7 @@
 ##bcall
 Call variants using a site-specific binomial model.
+bcall uses [cereal](https://uscilab.github.io/cereal/)
+for serializing C++ objects and storing them to disk.
 
 ###Install
 ```

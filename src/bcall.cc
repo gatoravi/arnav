@@ -27,6 +27,9 @@ DEALINGS IN THE SOFTWARE.  */
 #include <functional>
 #include <map>
 #include <sstream>
+#include "cereal/types/unordered_map.hpp"
+#include "cereal/types/memory.hpp"
+#include "cereal/archives/binary.hpp"
 #include "gzstream/gzstream.h"
 #include "Rmath.h"
 
@@ -44,21 +47,36 @@ std::map<string, int> chr_to_int = {
 };
 
 //key is sampleID, value is path to readcount.gz file
-std::map<string, string> sample_to_readcountfile;
+std::unordered_map<string, string> sample_to_readcountfile;
 
-//first is total_ref_count, second is total_alt_count
-typedef pair<uint64_t, uint64_t> readcounts;
+//struct to store accumulated read counts
+struct readcounts {
+    uint64_t total_ref_count;
+    uint64_t total_alt_count;
+    template <class Archive>
+    void serialize(Archive& ar) {
+        ar(total_ref_count, total_alt_count);
+    }
+};
 
-//key is pos << 5 | chr_int, value is pair
-std::map<uint64_t, readcounts> site_readcounts;
+//key is pos << 5 | chr_int, value is struct readcounts
+std::unordered_map<uint64_t, readcounts> site_readcounts;
 
 //usage message
 int usage() {
-    cerr << endl << "./bcall file_with_mpileupcounts";
+    cerr << endl << "./bcall ";
+    cerr << endl << "\t prior-and-call file_with_mpileupcounts op_variants_file_name";
+    cerr << endl << "\t prior-dump file_with_mpileupcounts op_priors_dump_file_name";
+    cerr << endl << "\t prior-merge priors_dump_file_list";
     cerr << endl;
     cerr << endl << "The input file has two columns, sample_name and path to "
                     "\nfile with readcounts that have been compressed with "
                     "\nbgzip/gzip, for e.g `SRR1 SRR1_readcounts.gz`";
+    cerr << endl << "The prior-dump command creates a file that is a C++ map serialized using cereal "
+                    "\nand written to disk. This can then be read by a different "
+                    "\nprocess.";
+    cerr << endl << "The prior-merge command requires a file that has two columns, "
+                    "\ndump_name and path to dump file.";
     cerr << endl << endl;
     return 0;
 }
@@ -119,8 +137,9 @@ void apply_model_readcount_line(string sample, string line) {
         if(site_readcounts.find(key) == site_readcounts.end()) {
             throw runtime_error("Unable to find chr/pos " + chr + " " + to_string(pos));
         }
+        double total_rc = site_readcounts[key].total_ref_count + site_readcounts[key].total_alt_count;
         double prior_p =
-            (double)site_readcounts[key].first/(double) site_readcounts[key].second;
+            (double)site_readcounts[key].total_ref_count / (double) total_rc;
         //(1 - pbinom(8, 10, 0.5)) * 2  == binom.test(9, 10, 0.5, alternative="t")
         double p_value = (1 - pbinom(alt_count, ref_count + alt_count - 1, prior_p, true, false)) * 2;
         if (p_value < 0.05 && ref_count != 0 && alt_count != 0) {
@@ -139,11 +158,11 @@ void parse_readcount_line(string sample, string line) {
     if(chr_to_int.find(chr) != chr_to_int.end()) {
         uint64_t key = create_key(chr, pos);
         if(site_readcounts.find(key) == site_readcounts.end()) {
-            site_readcounts[key].first = 0;
-            site_readcounts[key].second = 0;
+            site_readcounts[key].total_ref_count = 0;
+            site_readcounts[key].total_alt_count = 0;
         }
-        site_readcounts[key].first += ref_count;
-        site_readcounts[key].second += alt_count;
+        site_readcounts[key].total_ref_count += ref_count;
+        site_readcounts[key].total_alt_count += alt_count;
     }
 }
 
@@ -187,10 +206,34 @@ void apply_model() {
 void print_priors() {
     for (auto& kv : site_readcounts) {
         cerr << "site " << kv.first;
-        cerr << " ref_c " << kv.second.first;
-        cerr << " alt_c " << kv.second.second;
+        cerr << " ref_c " << kv.second.total_ref_count;
+        cerr << " alt_c " << kv.second.total_alt_count;
         cerr << endl;
     }
+}
+
+//Write the priors map to a file
+void write_priors(const string& output_file) {
+    ofstream fout(output_file);
+    if (!fout.is_open()) {
+        throw runtime_error("unable to open " + output_file +
+                            " for writing.");
+    }
+    cereal::BinaryOutputArchive archive(fout);
+    archive(site_readcounts);
+    fout.close();
+}
+
+//Read the priors map from a file
+void read_priors(const string& prior_file) {
+    ifstream fin(prior_file);
+    if (!fin.is_open()) {
+        throw runtime_error("unable to open " + prior_file +
+                            " for reading priors.");
+    }
+    cereal::BinaryInputArchive archive(fin);
+    archive(site_readcounts);
+    fin.close();
 }
 
 //Iterate through the samples file and calc site-specific priors
@@ -211,18 +254,31 @@ void read_samples(char* samples_file) {
 }
 
 int main(int argc, char* argv[]) {
-    if(argc > 1) {
-        try {
-            read_samples(argv[1]);
-            calculate_priors();
-            //print_priors();
-            print_header();
-            apply_model();
-        } catch (const runtime_error& e) {
-            cerr << e.what() << endl;
-            return 1;
+    try {
+        if(argc == 4) {
+            read_samples(argv[2]);
+            if (string(argv[1]) == "prior-and-call") {
+                    calculate_priors();
+                    //print_priors();
+                    print_header();
+                    apply_model();
+                    return 0;
+            }
+            else if (string(argv[1]) == "prior-dump") {
+                    calculate_priors();
+                    print_priors();
+                    write_priors(string(argv[3]));
+                    return 0;
+            }
         }
-    } else {
-        return usage();
+        if (argc == 3 && string(argv[1]) == "prior-merge") {
+            read_priors(string(argv[2]));
+            print_priors();
+            return 0;
+        }
+    } catch (const runtime_error& e) {
+        cerr << e.what() << endl;
+        return 1;
     }
+    return usage();
 }
