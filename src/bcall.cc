@@ -67,6 +67,7 @@ int usage() {
     cerr << endl << "./bcall ";
     cerr << endl << "\t prior-and-call file_with_mpileupcounts op_variants_file_name";
     cerr << endl << "\t prior-dump file_with_mpileupcounts op_priors_dump_file_name";
+    cerr << endl << "\t prior-dump-fixed file_with_mpileupcounts op_priors_dump_file_name fixed-sites.bed.gz";
     cerr << endl << "\t prior-merge priors_dump_file_list";
     cerr << endl;
     cerr << endl << "The input file has two columns, sample_name and path to "
@@ -74,7 +75,7 @@ int usage() {
                     "\nbgzip/gzip, for e.g `SRR1 SRR1_readcounts.gz`";
     cerr << endl << "The prior-dump command creates a file that is a C++ map serialized using cereal "
                     "\nand written to disk. This can then be read by a different "
-                    "\nprocess.";
+                    "\nprocess. The prior-dump-fixed only looks at sites specified by the bed.gz file.";
     cerr << endl << "The prior-merge command requires a file that has two columns, "
                     "\ndump_name and path to dump file.";
     cerr << endl << endl;
@@ -126,7 +127,7 @@ inline void print_out_line(string sample, double p_value, string line, ostream& 
 //Takes a line of the readcount file as input and applies
 //the binomial test, the `p` is calculated using all the
 //readcounts at this site across samples
-void apply_model_readcount_line(string sample, string line) {
+void apply_model_readcount_line(string sample, string line, bool fixed_sites = false) {
     stringstream ss(line);
     string chr, ref;
     uint32_t pos, depth, ref_count, alt_count;
@@ -149,7 +150,7 @@ void apply_model_readcount_line(string sample, string line) {
 }
 
 //parse a line from the readcount file
-void parse_readcount_line(string sample, string line) {
+void parse_readcount_line(string sample, string line, bool fixed_sites = false) {
     stringstream ss(line);
     string chr, ref;
     uint32_t pos, depth, ref_count, alt_count;
@@ -158,6 +159,10 @@ void parse_readcount_line(string sample, string line) {
     if(chr_to_int.find(chr) != chr_to_int.end()) {
         uint64_t key = create_key(chr, pos);
         if(site_readcounts.find(key) == site_readcounts.end()) {
+            //Sites are fixed by the BED file, don't add new sites
+            if (fixed_sites) {
+                return;
+            }
             site_readcounts[key].total_ref_count = 0;
             site_readcounts[key].total_alt_count = 0;
         }
@@ -169,14 +174,15 @@ void parse_readcount_line(string sample, string line) {
 //iterate through readcount file - And apply model to each line
 //first arg is name of the gz file
 //second argument is the function to apply to each line of the file
-void parse_readcount_file(string sample, string gzfile, function<void(string, string)> func) {
+void parse_readcount_file(string sample, string gzfile, function<void(string, string, bool)> func,
+                          bool fixed_sites = false) {
     igzstream in(gzfile.c_str());
     cerr << "Opening " << gzfile << endl;
     std::string line;
     int line_count = 0;
     std::getline(in, line); //Skip header
     while(std::getline(in, line)){
-        func(sample, line);
+        func(sample, line, fixed_sites);
         line_count += 1;
     }
     if(!line_count) {
@@ -186,18 +192,18 @@ void parse_readcount_file(string sample, string gzfile, function<void(string, st
 }
 
 //Iterate through each sample's readcounts
-void calculate_priors() {
-    function<void(string, string)> parse_line = parse_readcount_line;
+void calculate_priors(bool fixed_sites = false) {
+    function<void(string, string, bool)> parse_line = parse_readcount_line;
     for (auto& kv : sample_to_readcountfile) {
         cerr << "Processing " << kv.first << endl;
-        parse_readcount_file(kv.first, kv.second, parse_line);
+        parse_readcount_file(kv.first, kv.second, parse_line, fixed_sites);
         cerr << "Size of readcount map is " << site_readcounts.size() << endl;
     }
 }
 
 //Iterate through each sample's readcounts and call
 void apply_model() {
-    function<void(string, string)> apply_model_line = apply_model_readcount_line;
+    function<void(string, string, bool)> apply_model_line = apply_model_readcount_line;
     for (auto& kv : sample_to_readcountfile) {
         cerr << "Applying model to " << kv.first << endl;
         parse_readcount_file(kv.first, kv.second, apply_model_line);
@@ -205,8 +211,13 @@ void apply_model() {
 }
 
 //Print the priors for each site
-void print_priors() {
+void print_priors(bool print_zeros = true) {
     for (auto& kv : site_readcounts) {
+        if(print_zeros == false &&
+           kv.second.total_ref_count == 0 &&
+           kv.second.total_alt_count == 0) {
+            continue;
+        }
         cerr << "site " << kv.first;
         cerr << " ref_c " << kv.second.total_ref_count;
         cerr << " alt_c " << kv.second.total_alt_count;
@@ -269,9 +280,39 @@ void read_samples(char* samples_file) {
     }
 }
 
+void add_bedline_to_map(string line) {
+    string chr;
+    uint32_t start, end;
+    stringstream ss(line);
+    ss >> chr >> start >> end;
+    for (uint32_t pos = start + 1; pos <= end; pos++) {
+        uint64_t key = create_key(chr, pos);
+        //Initialize total_ref and total_alt to zero
+        site_readcounts[key] = {0, 0};
+    }
+}
+
+//Read a BED file and only store those sites in the map
+void initialize_fixed_map(string bedFile) {
+    igzstream in(bedFile.c_str());
+    cerr << "Initializing map with sites in  " << bedFile << endl;
+    std::string line;
+    int line_count = 0;
+    std::getline(in, line); //Skip header
+    while(std::getline(in, line)){
+        add_bedline_to_map(line);
+        line_count += 1;
+    }
+    if(!line_count) {
+        throw runtime_error("Bedfile empty - " + bedFile);
+    }
+    cerr << "Read " << line_count << " lines from " << bedFile << endl;
+    cerr << "Size of readcount map is " << site_readcounts.size() << endl;
+}
+
 int main(int argc, char* argv[]) {
     try {
-        if(argc == 4) {
+        if(argc >= 4) {
             read_samples(argv[2]);
             if (string(argv[1]) == "prior-and-call") {
                     calculate_priors();
@@ -283,6 +324,13 @@ int main(int argc, char* argv[]) {
             else if (string(argv[1]) == "prior-dump") {
                     calculate_priors();
                     print_priors();
+                    write_priors(string(argv[3]));
+                    return 0;
+            }
+            else if (argc > 4 && string(argv[1]) == "prior-dump-fixed") {
+                    initialize_fixed_map(string(argv[4]));
+                    calculate_priors(true);
+                    print_priors(false);
                     write_priors(string(argv[3]));
                     return 0;
             }

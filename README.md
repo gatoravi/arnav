@@ -11,6 +11,13 @@ mkdir build && cd build && cmake .. && make
 ```
 
 ###Usage
+
+####Get all options
 ```
 ./bcall
+```
+
+####Estimate priors on fixed sites
+```
+./bcall prior-dump-fixed samples_rclist.tsv dump_output SeqCap_EZ_Exome_v3_primary.bed.gz
 ```
