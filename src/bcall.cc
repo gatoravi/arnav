@@ -85,8 +85,8 @@ int usage() {
 //Create a key that is of type double
 //The key is unique for a chr:pos combination
 //Left shift the position, AND the chr bits
-uint64_t create_key(string chr, uint32_t pos) {
-    int chr_int = chr_to_int[chr];
+uint64_t create_key(string chr, uint64_t pos) {
+    uint32_t chr_int = chr_to_int[chr];
     /* //see binary encoding
     bitset<5> x(chr_int);
     cerr << "chr_x is " << x << endl;
@@ -96,7 +96,7 @@ uint64_t create_key(string chr, uint32_t pos) {
     bitset<64> key_x(unique_key);
     cerr << "key_x is " << key_x << endl;
     */
-    uint64_t unique_key = (pos << 5) | chr_int;
+    uint64_t unique_key = (uint64_t) (pos << 32) | chr_int;
     return unique_key;
 }
 
@@ -285,6 +285,10 @@ void add_bedline_to_map(string line) {
     uint32_t start, end;
     stringstream ss(line);
     ss >> chr >> start >> end;
+    //Skip header
+    if(chr == "track") {
+        return;
+    }
     for (uint32_t pos = start + 1; pos <= end; pos++) {
         uint64_t key = create_key(chr, pos);
         //Initialize total_ref and total_alt to zero
@@ -298,7 +302,6 @@ void initialize_fixed_map(string bedFile) {
     cerr << "Initializing map with sites in  " << bedFile << endl;
     std::string line;
     int line_count = 0;
-    std::getline(in, line); //Skip header
     while(std::getline(in, line)){
         add_bedline_to_map(line);
         line_count += 1;
