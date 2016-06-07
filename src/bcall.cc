@@ -46,6 +46,17 @@ std::map<string, int> chr_to_int = {
     {"MT", 24}
 };
 
+//Map from chromosome to integer
+std::map<int, string> int_to_chr = {
+    {0, "1"}, {1, "2"}, {2, "3"}, {3, "4"},
+    {4, "5"}, {5, "6"}, {6, "7"}, {7, "8"},
+    {8, "9"}, {9, "10"}, {10, "11"}, {11, "12"},
+    {12, "13"}, {13, "14"}, {14, "15"}, {15, "16"},
+    {16, "17"}, {17, "18"}, {18, "19"}, {19, "20"},
+    {20, "21"}, {21, "22"}, {22, "X"}, {23, "Y"},
+    {24, "MT"}
+};
+
 //key is sampleID, value is path to readcount.gz file
 std::unordered_map<string, string> sample_to_readcountfile;
 
@@ -80,6 +91,19 @@ int usage() {
                     "\ndump_name and path to dump file.";
     cerr << endl << endl;
     return 0;
+}
+
+//Split a key into constituent chr and pos
+pair<string, uint32_t> decode_key(uint64_t key) {
+    int chr_index = static_cast<uint32_t>(key);
+    if(chr_index < 0 || chr_index > 24) {
+        throw runtime_error("Unable to decode key " + to_string(key));
+    }
+    //left most 32 bits
+    string chr = int_to_chr[chr_index];
+    //Right most 32 bits
+    uint32_t pos = static_cast<uint32_t>(key >> 32);
+    return std::make_pair(chr, pos);
 }
 
 //Create a key that is of type double
@@ -218,7 +242,9 @@ void print_priors(bool print_zeros = true) {
            kv.second.total_alt_count == 0) {
             continue;
         }
-        cerr << "site " << kv.first;
+        auto decoded = decode_key(kv.first);
+        cerr << "key " << kv.first;
+        cerr << " decoded-key " << decoded.first << ":" << decoded.second;
         cerr << " ref_c " << kv.second.total_ref_count;
         cerr << " alt_c " << kv.second.total_alt_count;
         cerr << endl;
@@ -333,7 +359,7 @@ int main(int argc, char* argv[]) {
             else if (argc > 4 && string(argv[1]) == "prior-dump-fixed") {
                     initialize_fixed_map(string(argv[4]));
                     calculate_priors(true);
-                    //print_priors(false);
+                    print_priors(false);
                     write_priors(string(argv[3]));
                     return 0;
             }
