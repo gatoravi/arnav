@@ -1,0 +1,23 @@
+Initializing map with sites in  ../test/data/regions.bed
+Read 3 lines from ../test/data/regions.bed
+Size of readcount map is 15634
+Processing t3
+Opening ../test/data/t3.gz
+Read 15 lines from ../test/data/t3.gz
+Size of readcount map is 15634
+Processing t2
+Opening ../test/data/t2.gz
+Read 14 lines from ../test/data/t2.gz
+Size of readcount map is 15634
+Processing t1
+Opening ../test/data/t1.gz
+Read 13 lines from ../test/data/t1.gz
+Size of readcount map is 15634
+key 62848256442368 decoded-key 1:14633 ref_c 18 alt_c 2
+key 62839666507776 decoded-key 1:14631 ref_c 16 alt_c 0
+key 62835371540480 decoded-key 1:14630 ref_c 45 alt_c 20
+key 62818191671296 decoded-key 1:14626 ref_c 30 alt_c 109
+key 1073741824000000000 decoded-key 1:250000000 ref_c 29 alt_c 4
+key 858993459222 decoded-key X:200 ref_c 42 alt_c 15
+key 429496729622 decoded-key X:100 ref_c 42 alt_c 21
+key 4294967296 decoded-key 1:1 ref_c 36 alt_c 1
