@@ -79,7 +79,7 @@ int usage() {
     cerr << endl << "\t prior-and-call file_with_mpileupcounts op_variants_file_name";
     cerr << endl << "\t prior-dump file_with_mpileupcounts op_priors_dump_file_name";
     cerr << endl << "\t prior-dump-fixed file_with_mpileupcounts op_priors_dump_file_name fixed-sites.bed.gz";
-    cerr << endl << "\t prior-merge priors_dump_file_list";
+    cerr << endl << "\t prior-merge priors_dump_file_list merged_dump_file";
     cerr << endl;
     cerr << endl << "The input file has two columns, sample_name and path to "
                     "\nfile with readcounts that have been compressed with "
@@ -234,8 +234,18 @@ void apply_model() {
     }
 }
 
+//Print the header for priors for each site
+void print_priors_header(ostream& fout) {
+    fout << "#chr" << "\t" << "pos" << "\t";
+    fout << "key" << "\t";
+    fout << "total_ref_count" << "\t";
+    fout << "total_alt_count";
+    fout << endl;
+}
+
 //Print the priors for each site
-void print_priors(bool print_zeros = true) {
+void print_priors(ostream& fout, bool print_zeros = true) {
+    print_priors_header(fout);
     for (auto& kv : site_readcounts) {
         if(print_zeros == false &&
            kv.second.total_ref_count == 0 &&
@@ -243,11 +253,11 @@ void print_priors(bool print_zeros = true) {
             continue;
         }
         auto decoded = decode_key(kv.first);
-        cerr << "key " << kv.first;
-        cerr << " decoded-key " << decoded.first << ":" << decoded.second;
-        cerr << " ref_c " << kv.second.total_ref_count;
-        cerr << " alt_c " << kv.second.total_alt_count;
-        cerr << endl;
+        fout << decoded.first << "\t" << decoded.second << "\t";
+        fout << kv.first << "\t";
+        fout << kv.second.total_ref_count << "\t";
+        fout << kv.second.total_alt_count;
+        fout << endl;
     }
 }
 
@@ -266,7 +276,7 @@ void write_priors(const string& output_file) {
 //Read the priors map from a file
 void read_priors() {
     for (auto& kv : sample_to_readcountfile) {
-        cout << "Reading dump " << kv.first << endl;
+        cerr << "Reading dump " << kv.first << endl;
         string prior_file = kv.second;
         ifstream fin(prior_file);
         if (!fin.is_open()) {
@@ -345,30 +355,31 @@ int main(int argc, char* argv[]) {
             read_samples(argv[2]);
             if (string(argv[1]) == "prior-and-call") {
                     calculate_priors();
-                    //print_priors();
+                    //print_priors(cout);
                     print_header();
                     apply_model();
                     return 0;
             }
             else if (string(argv[1]) == "prior-dump") {
                     calculate_priors();
-                    print_priors();
+                    print_priors(cout);
                     write_priors(string(argv[3]));
                     return 0;
             }
             else if (argc > 4 && string(argv[1]) == "prior-dump-fixed") {
                     initialize_fixed_map(string(argv[4]));
                     calculate_priors(true);
-                    print_priors(false);
+                    //print_priors(false);
                     write_priors(string(argv[3]));
                     return 0;
             }
-        }
-        if (argc == 3 && string(argv[1]) == "prior-merge") {
-            read_samples(argv[2]);
-            read_priors();
-            print_priors();
-            return 0;
+            else if (string(argv[1]) == "prior-merge") {
+                read_samples(argv[2]);
+                read_priors();
+                print_priors(cout);
+                write_priors(string(argv[3]));
+                return 0;
+            }
         }
     } catch (const runtime_error& e) {
         cerr << e.what() << endl;
