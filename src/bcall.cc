@@ -369,7 +369,7 @@ int main(int argc, char* argv[]) {
             else if (argc > 4 && string(argv[1]) == "prior-dump-fixed") {
                     initialize_fixed_map(string(argv[4]));
                     calculate_priors(true);
-                    //print_priors(false);
+                    print_priors(cout, false);
                     write_priors(string(argv[3]));
                     return 0;
             }

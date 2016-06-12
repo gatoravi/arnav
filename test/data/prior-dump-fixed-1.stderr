@@ -1,0 +1,15 @@
+Initializing map with sites in  ../test/data/regions.bed
+Read 3 lines from ../test/data/regions.bed
+Size of readcount map is 15634
+Processing t3
+Opening ../test/data/t3.gz
+Read 15 lines from ../test/data/t3.gz
+Size of readcount map is 15634
+Processing t2
+Opening ../test/data/t2.gz
+Read 14 lines from ../test/data/t2.gz
+Size of readcount map is 15634
+Processing t1
+Opening ../test/data/t1.gz
+Read 13 lines from ../test/data/t1.gz
+Size of readcount map is 15634
