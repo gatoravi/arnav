@@ -80,8 +80,9 @@ int usage() {
     cerr << endl << "\t prior-dump file_with_mpileupcounts op_priors_dump_file_name";
     cerr << endl << "\t prior-dump-fixed file_with_mpileupcounts op_priors_dump_file_name fixed-sites.bed.gz";
     cerr << endl << "\t prior-merge priors_dump_file_list merged_dump_file";
+    cerr << endl << "\t call-using-merged file_with_mpileupcounts merged_dump_file";
     cerr << endl;
-    cerr << endl << "The input file has two columns, sample_name and path to "
+    cerr << endl << "The file_with_mpileupcounts has two columns, sample_name and path to "
                     "\nfile with readcounts that have been compressed with "
                     "\nbgzip/gzip, for e.g `SRR1 SRR1_readcounts.gz`";
     cerr << endl << "The prior-dump command creates a file that is a C++ map serialized using cereal "
@@ -160,13 +161,15 @@ void apply_model_readcount_line(string sample, string line, bool fixed_sites = f
     if(chr_to_int.find(chr) != chr_to_int.end()) {
         uint64_t key = create_key(chr, pos);
         if(site_readcounts.find(key) == site_readcounts.end()) {
-            throw runtime_error("Unable to find chr/pos " + chr + " " + to_string(pos));
+            //throw runtime_error("Unable to find chr/pos " + chr + " " + to_string(pos));
+            //Not in the merged-map
+            return;
         }
         double total_rc = site_readcounts[key].total_ref_count + site_readcounts[key].total_alt_count;
         double prior_p =
-            (double)site_readcounts[key].total_ref_count / (double) total_rc;
-        //(1 - pbinom(8, 10, 0.5)) * 2  == binom.test(9, 10, 0.5, alternative="t")
-        double p_value = (1 - pbinom(alt_count, ref_count + alt_count - 1, prior_p, true, false)) * 2;
+            (double)site_readcounts[key].total_alt_count / (double) total_rc;
+        //(1 - pbinom(8, 10, 0.5))   == binom.test(9, 10, 0.5, alternative="greater")
+        double p_value = 1 - pbinom(alt_count, ref_count + alt_count, prior_p, true, false);
         if (p_value < 0.05 && ref_count != 0 && alt_count != 0) {
             print_out_line(sample, p_value, line);
         }
@@ -204,8 +207,10 @@ void parse_readcount_file(string sample, string gzfile, function<void(string, st
     cerr << "Opening " << gzfile << endl;
     std::string line;
     int line_count = 0;
-    std::getline(in, line); //Skip header
     while(std::getline(in, line)){
+        if(line.substr(0, 3) == "chr") {
+            continue;
+        }
         func(sample, line, fixed_sites);
         line_count += 1;
     }
@@ -271,6 +276,19 @@ void write_priors(const string& output_file) {
     cereal::BinaryOutputArchive archive(fout);
     archive(site_readcounts);
     fout.close();
+}
+
+//Read the prior from the merged prior-dump file
+void read_priors_merged(string merged_prior_dump) {
+    cerr << "Reading merged dump " << merged_prior_dump << endl;
+    ifstream fin(merged_prior_dump);
+    if (!fin.is_open()) {
+        throw runtime_error("unable to open " + merged_prior_dump +
+                            " for reading priors.");
+    }
+    cereal::BinaryInputArchive archive(fin);
+    archive(site_readcounts);
+    fin.close();
 }
 
 //Read the priors map from a file
@@ -378,6 +396,12 @@ int main(int argc, char* argv[]) {
                 read_priors();
                 print_priors(cout);
                 write_priors(string(argv[3]));
+                return 0;
+            }
+            else if (string(argv[1]) == "call-using-merged") {
+                read_samples(argv[2]);
+                read_priors_merged(argv[3]);
+                apply_model();
                 return 0;
             }
         }
