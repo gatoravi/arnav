@@ -140,13 +140,17 @@ void print_header(ostream& out = cout) {
         << "gcount" << "\t"
         << "tcount" << "\t"
         << "ncount" << "\t"
-        << "indelcount"
+        << "indelcount" << "\t"
+        << "site_total_alt_count" << "\t"
+        << "site_total_readcount" << "\t"
         << endl;
 }
 
 //Print output header
-inline void print_out_line(string sample, double p_value, string line, ostream& out = cout) {
-    out << sample << "\t" << p_value << "\t" << line << endl;
+inline void print_out_line(string sample, double p_value, string line,
+        uint64_t total_alt_count, uint64_t total_readcount, ostream& out = cout) {
+    out << sample << "\t" << p_value << "\t" << line << "\t" << total_alt_count <<
+        "\t" << total_readcount << endl;
 }
 
 //Takes a line of the readcount file as input and applies
@@ -165,13 +169,13 @@ void apply_model_readcount_line(string sample, string line, bool fixed_sites = f
             //Not in the merged-map
             return;
         }
-        double total_rc = site_readcounts[key].total_ref_count + site_readcounts[key].total_alt_count;
+        uint64_t total_rc = site_readcounts[key].total_ref_count + site_readcounts[key].total_alt_count;
         double prior_p =
             (double)site_readcounts[key].total_alt_count / (double) total_rc;
         //(1 - pbinom(8, 10, 0.5))   == binom.test(9, 10, 0.5, alternative="greater")
         double p_value = 1 - pbinom(alt_count, ref_count + alt_count, prior_p, true, false);
         if (p_value < 0.05 && ref_count != 0 && alt_count != 0) {
-            print_out_line(sample, p_value, line);
+            print_out_line(sample, p_value, line, site_readcounts[key].total_alt_count, total_rc);
         }
     }
 }
