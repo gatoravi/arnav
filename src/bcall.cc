@@ -31,6 +31,7 @@ DEALINGS IN THE SOFTWARE.  */
 #include "cereal/types/memory.hpp"
 #include "cereal/archives/binary.hpp"
 #include "gzstream/gzstream.h"
+#include "kfunc.h"
 #include "Rmath.h"
 
 using namespace std;
@@ -126,9 +127,9 @@ uint64_t create_key(string chr, uint64_t pos) {
 }
 
 //Print output header
-void print_header(ostream& out = cout) {
+void print_out_header(ostream& out = cout) {
     out << "sample" << "\t"
-        << "p_value" << "\t"
+        << "binomial_p_value" << "\t"
         << "chr" << "\t"
         << "pos" << "\t"
         << "depth" << "\t"
@@ -143,14 +144,18 @@ void print_header(ostream& out = cout) {
         << "indelcount" << "\t"
         << "site_total_alt_count" << "\t"
         << "site_total_readcount" << "\t"
+        << "fisher_pvalue"
+        << "beta_lowerq"
         << endl;
 }
 
 //Print output header
-inline void print_out_line(string sample, double p_value, string line,
-        uint64_t total_alt_count, uint64_t total_readcount, ostream& out = cout) {
-    out << sample << "\t" << p_value << "\t" << line << "\t" << total_alt_count <<
-        "\t" << total_readcount << endl;
+inline void print_out_line(string sample, double binomial_pval, string line,
+        uint64_t total_alt_count, uint64_t total_readcount,
+        double fisher_pval, double lower_betaq,
+        ostream& out = cout) {
+    out << sample << "\t" << binomial_pval << "\t" << line << "\t" << total_alt_count <<
+        "\t" << total_readcount << "\t" << fisher_pval << "\t" << lower_betaq << endl;
 }
 
 //Takes a line of the readcount file as input and applies
@@ -173,9 +178,23 @@ void apply_model_readcount_line(string sample, string line, bool fixed_sites = f
         double prior_p =
             (double)site_readcounts[key].total_alt_count / (double) total_rc;
         //(1 - pbinom(8, 10, 0.5))   == binom.test(9, 10, 0.5, alternative="greater")
-        double p_value = 1 - pbinom(alt_count, ref_count + alt_count, prior_p, true, false);
-        if (p_value < 0.05 && ref_count != 0 && alt_count != 0) {
-            print_out_line(sample, p_value, line, site_readcounts[key].total_alt_count, total_rc);
+        double binomial_p_value = 1 - pbinom(alt_count, ref_count + alt_count, prior_p, true, false);
+        //Find pbeta on the beta posterior
+        double alpha = 1 + alt_count;
+        double beta = 999 + ref_count;
+        //Call fisher-exact
+        double fisher_left_p, fisher_right_p, fisher_twosided_p;
+        kt_fisher_exact(alt_count, ref_count + alt_count, site_readcounts[key].total_alt_count,
+                total_rc, &fisher_left_p, &fisher_right_p, &fisher_twosided_p);
+        if (binomial_p_value < 0.05 && ref_count != 0 && alt_count != 0) {
+            //last two args are lower_tail and log_p
+            //double beta_pval = 1 - pbeta(0.01, alpha, beta, false, false);
+            double lower_q = qbeta(0.025, alpha, beta, true, false);
+            //if (lower_q > 0.01) {
+                std::cout << qbeta(0.025, alpha, beta, true, false) << "\t" << qbeta(0.0975, alpha, beta, true, false) << endl;
+                print_out_line(sample, binomial_p_value, line, site_readcounts[key].total_alt_count, total_rc,
+                            fisher_twosided_p, lower_q);
+            //}
         }
     }
 }
@@ -236,6 +255,7 @@ void calculate_priors(bool fixed_sites = false) {
 
 //Iterate through each sample's readcounts and call
 void apply_model() {
+    print_out_header();
     function<void(string, string, bool)> apply_model_line = apply_model_readcount_line;
     for (auto& kv : sample_to_readcountfile) {
         cerr << "Applying model to " << kv.first << endl;
@@ -378,7 +398,6 @@ int main(int argc, char* argv[]) {
             if (string(argv[1]) == "prior-and-call") {
                     calculate_priors();
                     //print_priors(cout);
-                    print_header();
                     apply_model();
                     return 0;
             }
