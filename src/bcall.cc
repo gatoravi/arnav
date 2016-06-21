@@ -32,6 +32,7 @@ DEALINGS IN THE SOFTWARE.  */
 #include "cereal/archives/binary.hpp"
 #include "gzstream/gzstream.h"
 #include "bh-fdr.h"
+#include "common.h"
 #include "Rmath.h"
 
 using namespace std;
