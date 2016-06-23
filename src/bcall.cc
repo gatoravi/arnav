@@ -74,6 +74,10 @@ struct readcounts {
 
 //key is pos << 5 | chr_int, value is struct readcounts
 std::unordered_map<uint64_t, readcounts> site_readcounts;
+//vector of p-values for a sample, apply FDR adjustment to these
+std::vector<double> pvalues;
+//Map of line => binomial_test_pval
+std::unordered_map<string, double> lines_pvalues;
 
 //usage message
 int usage() {
@@ -148,11 +152,14 @@ void print_header(ostream& out = cout) {
         << endl;
 }
 
-//Print output header
-inline void print_out_line(string sample, double p_value, string line,
-        uint64_t total_alt_count, uint64_t total_readcount, ostream& out = cout) {
-    out << sample << "\t" << p_value << "\t" << line << "\t" << total_alt_count <<
-        "\t" << total_readcount << endl;
+//Print output line
+inline void print_significant_lines(double pval_cutoff, ostream& out = cout) {
+    for (auto& kv : lines_pvalues) {
+        //Print the line if significant
+        if (kv.second <= pval_cutoff) {
+            out << kv.first << endl;
+        }
+    }
 }
 
 //Takes a line of the readcount file as input and applies
@@ -161,9 +168,27 @@ inline void print_out_line(string sample, double p_value, string line,
 void apply_model_readcount_line(string sample, string line, bool fixed_sites = false) {
     stringstream ss(line);
     string chr, ref;
-    uint32_t pos, depth, ref_count, alt_count;
-    ss >> chr >> pos >> depth >> ref;
-    ss >> ref_count >> alt_count;
+    uint32_t pos, depth, ref_count, all_alt_count, alt_count,
+             acount, ccount, gcount, tcount;
+    ss >> chr >> pos >> depth >> ref >> ref_count;
+    //Get counts for specific nucleotides
+    ss >> all_alt_count >> acount >> ccount >> gcount >> tcount;
+    switch(ref[0]) {
+        case 'A':
+            alt_count = std::max({ccount, gcount, tcount});
+            break;
+        case 'C':
+            alt_count = std::max({acount, gcount, tcount});
+            break;
+        case 'G':
+            alt_count = std::max({acount, ccount, tcount});
+            break;
+        case 'T':
+            alt_count = std::max({acount, ccount, gcount});
+            break;
+        default://Don't call at this position for N etc
+            return;
+    }
     if(chr_to_int.find(chr) != chr_to_int.end()) {
         uint64_t key = create_key(chr, pos);
         if(site_readcounts.find(key) == site_readcounts.end()) {
@@ -171,13 +196,21 @@ void apply_model_readcount_line(string sample, string line, bool fixed_sites = f
             //Not in the merged-map
             return;
         }
-        uint64_t total_rc = site_readcounts[key].total_ref_count + site_readcounts[key].total_alt_count;
+        //Subtract this sample's counts from the prior
+        uint64_t total_alt_count = site_readcounts[key].total_alt_count - all_alt_count;
+        uint64_t total_rc =
+            site_readcounts[key].total_ref_count + site_readcounts[key].total_alt_count - ref_count - all_alt_count;
         double prior_p =
             (double)site_readcounts[key].total_alt_count / (double) total_rc;
-        //(1 - pbinom(8, 10, 0.5))   == binom.test(9, 10, 0.5, alternative="greater")
-        double p_value = 1 - pbinom(alt_count, ref_count + alt_count, prior_p, true, false);
-        if (p_value < 0.05 && ref_count != 0 && alt_count != 0) {
-            print_out_line(sample, p_value, line, site_readcounts[key].total_alt_count, total_rc);
+        if (alt_count >= 4) { //only look at sites with 4 or more variant supporting reads
+            //(1 - pbinom(8, 10, 0.5))   == binom.test(9, 10, 0.5, alternative="greater")
+            double p_value = 1 - pbinom(alt_count, ref_count + alt_count, prior_p, true, false);
+            pvalues.push_back(p_value);
+            if (p_value < 0.05) {
+                line = sample + "\t" + common::num_to_str(p_value) + "\t" + line + "\t" +
+                        common::num_to_str(total_alt_count) + "\t" + common::num_to_str(total_rc);
+                lines_pvalues[line] = p_value;
+            }
         }
     }
 }
@@ -240,8 +273,15 @@ void calculate_priors(bool fixed_sites = false) {
 void apply_model() {
     function<void(string, string, bool)> apply_model_line = apply_model_readcount_line;
     for (auto& kv : sample_to_readcountfile) {
-        cerr << "Applying model to " << kv.first << endl;
+        cerr << endl << "Applying model to " << kv.first << endl;
+        pvalues.clear(); //Remove all p-values from previous sample
+        lines_pvalues.clear(); //Remove all lines and p-values from previous sample
         parse_readcount_file(kv.first, kv.second, apply_model_line);
+        cerr << "The number of tests performed for this sample is: " << pvalues.size() << endl;
+        cerr << "Applying the BH-procedure to control FDR." << endl;
+        double pvalue_cutoff = bh_fdr(pvalues, 0.05);
+        cerr << "The p-value cutoff is:" << pvalue_cutoff;
+        print_significant_lines(pvalue_cutoff);
     }
 }
 
