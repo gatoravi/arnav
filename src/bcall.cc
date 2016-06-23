@@ -280,7 +280,7 @@ void apply_model() {
         cerr << "The number of tests performed for this sample is: " << pvalues.size() << endl;
         cerr << "Applying the BH-procedure to control FDR." << endl;
         double pvalue_cutoff = bh_fdr(pvalues, 0.05);
-        cerr << "The p-value cutoff is:" << pvalue_cutoff;
+        cerr << "The p-value cutoff is:" << pvalue_cutoff << endl;
         print_significant_lines(pvalue_cutoff);
     }
 }
