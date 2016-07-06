@@ -78,6 +78,8 @@ std::unordered_map<uint64_t, readcounts> site_readcounts;
 std::vector<double> pvalues;
 //Map of line => binomial_test_pval
 std::unordered_map<string, double> lines_pvalues;
+//Number of calls not in the site of interest
+uint64_t not_in_map = 0;
 
 //usage message
 int usage() {
@@ -196,6 +198,7 @@ void apply_model_readcount_line(string sample, string line, bool fixed_sites = f
             //throw runtime_error("Unable to find chr/pos " + chr + " " + to_string(pos));
             //Not in the merged-map
             //cerr << "not in map" << endl;
+            not_in_map++;
             return;
         }
         //Subtract this sample's counts from the prior
@@ -214,8 +217,7 @@ void apply_model_readcount_line(string sample, string line, bool fixed_sites = f
             //(1 - pbinom(8, 10, 0.5))   == binom.test(9, 10, 0.5, alternative="greater")
             double p_value = 1 - pbinom(alt_count, ref_count + alt_count, prior_p, true, false);
             pvalues.push_back(p_value);
-            float alpha = 0.05/9597; //make this configurable
-            if (p_value <= alpha) { //Only store lines <= alpha
+            if (p_value <= 0.05) { //Only store lines <= 0.05, these will be further filtered out while printing
                 line = line + "\t" +
                        common::num_to_str(total_ref_count) + "\t" + common::num_to_str(total_alt_count) +
                        "\t" + region + "\t" + common::num_to_str(p_value) + "\t" + sample;
@@ -223,13 +225,13 @@ void apply_model_readcount_line(string sample, string line, bool fixed_sites = f
                 lines_pvalues[line] = p_value;
             }
         } else {
-            //cerr << "not greater than 4 variant reads" << endl;
+            //cerr << "not greater than 2 variant reads" << endl;
         }
     }
 }
 
 //parse a line from the readcount file
-void parse_readcount_line(string sample, string line, bool fixed_sites = false) {
+void calculate_prior_line(string sample, string line, bool fixed_sites = false) {
     stringstream ss(line);
     string chr, ref;
     uint32_t pos, depth, ref_count, alt_count;
@@ -242,6 +244,9 @@ void parse_readcount_line(string sample, string line, bool fixed_sites = false) 
             if (fixed_sites) {
                 return;
             }
+            //if (alt_count == 0) { //Experimental - only look at sites with Non-zero alt
+            //    return;
+            //}
             site_readcounts[key].total_ref_count = 0;
             site_readcounts[key].total_alt_count = 0;
         }
@@ -253,6 +258,7 @@ void parse_readcount_line(string sample, string line, bool fixed_sites = false) 
 //iterate through readcount file - And apply model to each line
 //first arg is name of the gz file
 //second argument is the function to apply to each line of the file
+//The third argument specifies if we should look only at fixed sites of interest(passed as a param)
 void parse_readcount_file(string sample, string gzfile, function<void(string, string, bool)> func,
                           bool fixed_sites = false) {
     igzstream in(gzfile.c_str());
@@ -274,10 +280,9 @@ void parse_readcount_file(string sample, string gzfile, function<void(string, st
 
 //Iterate through each sample's readcounts
 void calculate_priors(bool fixed_sites = false) {
-    function<void(string, string, bool)> parse_line = parse_readcount_line;
     for (auto& kv : sample_to_readcountfile) {
         cerr << "Processing " << kv.first << endl;
-        parse_readcount_file(kv.first, kv.second, parse_line, fixed_sites);
+        parse_readcount_file(kv.first, kv.second, calculate_prior_line, fixed_sites);
         cerr << "Size of readcount map is " << site_readcounts.size() << endl;
     }
 }
@@ -286,13 +291,16 @@ void calculate_priors(bool fixed_sites = false) {
 void apply_model() {
     for (auto& kv : sample_to_readcountfile) {
         cerr << endl << "Applying model to " << kv.first << endl;
+        not_in_map = 0; //Global variable - BAD
         pvalues.clear(); //Remove all p-values from previous sample
         lines_pvalues.clear(); //Remove all lines and p-values from previous sample
         parse_readcount_file(kv.first, kv.second, apply_model_readcount_line);
         cerr << "The number of tests performed for this sample is: " << pvalues.size() << endl;
         cerr << "Applying the BH-procedure to control FDR." << endl;
-        double pvalue_cutoff = bh_fdr(pvalues, 0.05);
+        double pvalue_cutoff = 0.05/(float)9597; //Bonferroni
+        //double pvalue_cutoff = bh_fdr(pvalues, 0.05); //FDR
         cerr << "The p-value cutoff is:" << pvalue_cutoff << endl;
+        cerr << "The number of sites not in the region of interest is " << not_in_map;
         print_header();
         print_significant_lines(pvalue_cutoff);
     }
