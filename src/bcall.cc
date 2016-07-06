@@ -284,12 +284,11 @@ void calculate_priors(bool fixed_sites = false) {
 
 //Iterate through each sample's readcounts and call
 void apply_model() {
-    function<void(string, string, bool)> apply_model_line = apply_model_readcount_line;
     for (auto& kv : sample_to_readcountfile) {
         cerr << endl << "Applying model to " << kv.first << endl;
         pvalues.clear(); //Remove all p-values from previous sample
         lines_pvalues.clear(); //Remove all lines and p-values from previous sample
-        parse_readcount_file(kv.first, kv.second, apply_model_line);
+        parse_readcount_file(kv.first, kv.second, apply_model_readcount_line);
         cerr << "The number of tests performed for this sample is: " << pvalues.size() << endl;
         cerr << "Applying the BH-procedure to control FDR." << endl;
         double pvalue_cutoff = bh_fdr(pvalues, 0.05);
