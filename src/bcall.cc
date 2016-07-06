@@ -133,9 +133,7 @@ uint64_t create_key(string chr, uint64_t pos) {
 
 //Print output header
 void print_header(ostream& out = cout) {
-    out << "sample" << "\t"
-        << "p_value" << "\t"
-        << "chr" << "\t"
+    out << "chr" << "\t"
         << "pos" << "\t"
         << "depth" << "\t"
         << "ref_base" << "\t"
@@ -147,8 +145,11 @@ void print_header(ostream& out = cout) {
         << "tcount" << "\t"
         << "ncount" << "\t"
         << "indelcount" << "\t"
+        << "site_total_ref_count" << "\t"
         << "site_total_alt_count" << "\t"
-        << "site_total_readcount" << "\t"
+        << "region" << "\t"
+        << "p_value" << "\t"
+        << "sample"
         << endl;
 }
 
@@ -194,23 +195,35 @@ void apply_model_readcount_line(string sample, string line, bool fixed_sites = f
         if(site_readcounts.find(key) == site_readcounts.end()) {
             //throw runtime_error("Unable to find chr/pos " + chr + " " + to_string(pos));
             //Not in the merged-map
+            //cerr << "not in map" << endl;
             return;
         }
         //Subtract this sample's counts from the prior
         uint64_t total_alt_count = site_readcounts[key].total_alt_count - all_alt_count;
+        uint64_t total_ref_count = site_readcounts[key].total_ref_count - ref_count;
         uint64_t total_rc =
             site_readcounts[key].total_ref_count + site_readcounts[key].total_alt_count - ref_count - all_alt_count;
         double prior_p =
-            (double)site_readcounts[key].total_alt_count / (double) total_rc;
-        if (alt_count >= 4) { //only look at sites with 4 or more variant supporting reads
+            (double)total_alt_count / (double) total_rc;
+        if (prior_p == 0) { //Set lower bound on the sequencing error rate
+            prior_p = 0.001;
+        }
+        //This should help with pulling out from tabix
+        string region = chr + ":" + common::num_to_str(pos);
+        if (alt_count >= 2) { //only look at sites with 2 or more variant supporting reads
             //(1 - pbinom(8, 10, 0.5))   == binom.test(9, 10, 0.5, alternative="greater")
             double p_value = 1 - pbinom(alt_count, ref_count + alt_count, prior_p, true, false);
             pvalues.push_back(p_value);
-            if (p_value < 0.05) {
-                line = sample + "\t" + common::num_to_str(p_value) + "\t" + line + "\t" +
-                        common::num_to_str(total_alt_count) + "\t" + common::num_to_str(total_rc);
+            float alpha = 0.05/9597; //make this configurable
+            if (p_value <= alpha) { //Only store lines <= alpha
+                line = line + "\t" +
+                       common::num_to_str(total_ref_count) + "\t" + common::num_to_str(total_alt_count) +
+                       "\t" + region + "\t" + common::num_to_str(p_value) + "\t" + sample;
+                //Store the line with its pvalue in the map
                 lines_pvalues[line] = p_value;
             }
+        } else {
+            //cerr << "not greater than 4 variant reads" << endl;
         }
     }
 }
@@ -281,6 +294,7 @@ void apply_model() {
         cerr << "Applying the BH-procedure to control FDR." << endl;
         double pvalue_cutoff = bh_fdr(pvalues, 0.05);
         cerr << "The p-value cutoff is:" << pvalue_cutoff << endl;
+        print_header();
         print_significant_lines(pvalue_cutoff);
     }
 }
@@ -426,11 +440,11 @@ int main(int argc, char* argv[]) {
             }
             else if (string(argv[1]) == "prior-dump") {
                     calculate_priors();
-                    print_priors(cout);
+                    //print_priors(cout, false);
                     write_priors(string(argv[3]));
                     return 0;
             }
-            else if (argc > 4 && string(argv[1]) == "prior-dump-fixed") {
+            else if (argc > 4 && string(argv[1]) == "prior-dump-fixed") { //prior dump on fixed sites
                     initialize_fixed_map(string(argv[4]));
                     calculate_priors(true);
                     print_priors(cout, false);
