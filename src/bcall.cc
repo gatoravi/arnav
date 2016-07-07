@@ -296,8 +296,9 @@ void apply_model() {
         lines_pvalues.clear(); //Remove all lines and p-values from previous sample
         parse_readcount_file(kv.first, kv.second, apply_model_readcount_line);
         cerr << "The number of tests performed for this sample is: " << pvalues.size() << endl;
-        cerr << "Applying the BH-procedure to control FDR." << endl;
+        cerr << "Applying the Bonferroni correction to control pvalues." << endl;
         double pvalue_cutoff = 0.05/(float)9597; //Bonferroni
+        //cerr << "Applying the BH-procedure to control FDR." << endl;
         //double pvalue_cutoff = bh_fdr(pvalues, 0.05); //FDR
         cerr << "The p-value cutoff is:" << pvalue_cutoff << endl;
         cerr << "The number of sites not in the region of interest is " << not_in_map;
