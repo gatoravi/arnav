@@ -88,6 +88,7 @@ int usage() {
     cerr << endl << "\t prior-dump file_with_mpileupcounts op_priors_dump_file_name";
     cerr << endl << "\t prior-dump-fixed file_with_mpileupcounts op_priors_dump_file_name fixed-sites.bed.gz";
     cerr << endl << "\t prior-merge priors_dump_file_list merged_dump_file";
+    cerr << endl << "\t prior-print priors_dump_file_list";
     cerr << endl << "\t call-using-merged file_with_mpileupcounts merged_dump_file";
     cerr << endl;
     cerr << endl << "The file_with_mpileupcounts has two columns, sample_name and path to "
@@ -98,6 +99,7 @@ int usage() {
                     "\nprocess. The prior-dump-fixed only looks at sites specified by the bed.gz file.";
     cerr << endl << "The prior-merge command requires a file that has two columns, "
                     "\ndump_name and path to dump file.";
+    cerr << endl << "The prior-print command requires a dump file.";
     cerr << endl << endl;
     return 0;
 }
@@ -471,6 +473,11 @@ int main(int argc, char* argv[]) {
                 apply_model();
                 return 0;
             }
+        }
+        else if (argc == 3 && string(argv[1]) == "prior-print") {
+                read_priors_merged(argv[2]);
+                print_priors(cout);
+                return 0;
         }
     } catch (const runtime_error& e) {
         cerr << e.what() << endl;
