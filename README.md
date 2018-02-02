@@ -7,6 +7,7 @@ for serializing C++ objects and storing them to disk.
 
 ### Install
 ```
+git clone --recursive https://github.com/gatoravi/bcall
 mkdir build && cd build && cmake .. && make
 ```
 
