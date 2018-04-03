@@ -1,6 +1,8 @@
 ##bcall
+
 Call variants using a site-specific binomial model.
-bcall uses the [Rmath](https://github.com/gatoravi/Rmath)
+
+bcall uses the [Rmath](https://cran.r-project.org/doc/manuals/r-release/R-admin.html#The-standalone-Rmath-library)
 libraries for the pbinom function
 and uses [cereal](https://uscilab.github.io/cereal/)
 for serializing C++ objects and storing them to disk.
