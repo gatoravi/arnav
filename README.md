@@ -1,5 +1,4 @@
-##bcall
-
+## bcall
 Call variants using a site-specific binomial model.
 
 bcall uses the [Rmath](https://cran.r-project.org/doc/manuals/r-release/R-admin.html#The-standalone-Rmath-library)
@@ -29,3 +28,7 @@ mkdir build && cd build && cmake .. && make
 ```
 ./bcall call-using-merged sample_readcountfile_list.tsv merged_priors.dump
 ```
+
+### Workflow
+A workflow describing how bcall can be used to detect putative somatic mutations in RNA sequencing
+data is described [here.](http://gatoravi.github.io/genetics/2017/10/12/mutations-rnaseq.html)
