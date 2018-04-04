@@ -14,7 +14,7 @@ mkdir build && cd build && cmake .. && make
 
 ### Usage
 
-#### Get all options
+#### List all options available with bcall
 ```
 ./bcall
 ```
