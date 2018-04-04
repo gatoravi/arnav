@@ -19,15 +19,17 @@ mkdir build && cd build && cmake .. && make
 ./bcall
 ```
 
-#### Estimate priors on fixed sites
+#### Estimate site-specific priors for a list of sites specified in a bed file
 ```
-./bcall prior-dump-fixed samples_rclist.tsv dump_output SeqCap_EZ_Exome_v3_primary.bed.gz
+./bcall prior-dump-fixed samples_readcountfile_list.tsv merged_priors.dump list_of_regions.bed.gz
 ```
 
 #### To call mutations using the merged priors
 ```
 ./bcall call-using-merged sample_readcountfile_list.tsv merged_priors.dump
 ```
+
+For details on the file-formats used in the steps above please see the `Workflow` section below.
 
 ### Workflow
 A workflow describing how bcall can be used to detect putative somatic mutations in RNA sequencing
