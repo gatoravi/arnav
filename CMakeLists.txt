@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.2)
 
-project (bcall)
+project (arnav)
 set (CMAKE_CXX_STANDARD 11)
 include_directories ("${PROJECT_SOURCE_DIR}/src/")
 include_directories ("${PROJECT_SOURCE_DIR}/src/rmath/Rmath")
 include_directories ("${PROJECT_SOURCE_DIR}/src/fdr")
-add_executable (bcall "src/bcall.cc")
+add_executable (arnav "src/arnav.cc")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/src/")
-target_link_libraries (bcall Rmath z)
+target_link_libraries (arnav Rmath z)

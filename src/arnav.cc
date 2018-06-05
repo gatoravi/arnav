@@ -1,23 +1,23 @@
-/*  bcall.cc -- main
+/*  arnav.cc -- main
 
     Copyright (c) 2016, Avinash Ramu
 
     Author: Avinash Ramu <avinash3003@yahoo.co.in>
 
-    This file is part of bcall.
+    This file is part of arnav.
 
-    bcall is free software: you can redistribute it and/or modify
+    arnav is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
-    bcall is distributed in the hope that it will be useful,
+    arnav is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with bcall.  If not, see <http://www.gnu.org/licenses/>. */
+    along with arnav.  If not, see <http://www.gnu.org/licenses/>. */
 
 #include <bitset>
 #include <fstream>
@@ -80,7 +80,7 @@ uint64_t not_in_map = 0;
 
 //usage message
 int usage() {
-    cerr << endl << "./bcall ";
+    cerr << endl << "./arnav ";
     cerr << endl << "\t prior-and-call file_with_mpileupcounts op_variants_file_name";
     cerr << endl << "\t prior-dump file_with_mpileupcounts op_priors_dump_file_name";
     cerr << endl << "\t prior-dump-fixed file_with_mpileupcounts op_priors_dump_file_name fixed-sites.bed.gz";
