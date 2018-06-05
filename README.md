@@ -12,6 +12,10 @@ git clone --recursive https://github.com/gatoravi/bcall
 mkdir build && cd build && cmake .. && make
 ```
 
+### Quickstart
+A workflow describing how bcall can be used to detect putative somatic mutations in RNA sequencing
+data is described [here.](http://gatoravi.github.io/genetics/2017/10/12/mutations-rnaseq.html)
+
 ### Usage
 
 #### List all options available with bcall
@@ -30,7 +34,3 @@ mkdir build && cd build && cmake .. && make
 ```
 
 For details on the file-formats used in the steps above please see the `Workflow` section below.
-
-### Workflow
-A workflow describing how bcall can be used to detect putative somatic mutations in RNA sequencing
-data is described [here.](http://gatoravi.github.io/genetics/2017/10/12/mutations-rnaseq.html)
