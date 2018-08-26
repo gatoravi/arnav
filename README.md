@@ -1,5 +1,7 @@
 ## Arnav
-Call variants using a site-specific binomial model.
+Call variants using a site-specific binomial model. 
+
+The methods underlying Arnav are described in this [preprint.](https://www.biorxiv.org/content/early/2018/08/22/397539)
 
 arnav uses the [Rmath](https://cran.r-project.org/doc/manuals/r-release/R-admin.html#The-standalone-Rmath-library)
 libraries for the pbinom function
