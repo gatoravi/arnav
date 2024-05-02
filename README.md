@@ -16,7 +16,7 @@ mkdir build && cd build && cmake .. && make
 
 ### Quickstart
 A workflow describing how arnav can be used to detect putative somatic mutations in RNA sequencing
-data is described [here.](http://gatoravi.github.io/genetics/2017/10/12/mutations-rnaseq.html)
+data is described [here.](http://gatoravi.github.io/blog/genetics/2017/10/12/mutations-rnaseq.html)
 
 ### Usage
 
